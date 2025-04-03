@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Irrigation Dashboard</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        .sensor-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        .good {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .pump-on {
+            background-color: #28a745;
+            color: white;
+        }
+        .pump-off {
+            background-color: #dc3545;
+            color: white;
+        }
+        .charts {
+            margin-top: 30px;
+        }
+        iframe {
+            width: 100%;
+            height: 250px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Smart Irrigation Dashboard</h1>
+    
+    <div class="card">
+        <h2>Current Readings</h2>
+        <div id="readings">
+            <div>
+                <p>Soil Moisture: <span class="sensor-value" id="moisture-value">--</span>%</p>
+                <div class="status" id="moisture-status">Loading...</div>
+            </div>
+            <div>
+                <p>Temperature: <span class="sensor-value" id="temp-value">--</span>°C</p>
+                <div class="status" id="temp-status">Loading...</div>
+            </div>
+            <div>
+                <p>Humidity: <span class="sensor-value" id="humidity-value">--</span>%</p>
+                <div class="status" id="humidity-status">Loading...</div>
+            </div>
+            <div>
+                <p>Light Intensity: <span class="sensor-value" id="light-value">--</span></p>
+                <div class="status" id="light-status">Loading...</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>Irrigation Control</h2>
+        <p>Pump Status: <span class="sensor-value" id="pump-status">--</span></p>
+        <div class="controls">
+            <button id="pump-on" class="pump-on">Turn Pump ON</button>
+            <button id="pump-off" class="pump-off">Turn Pump OFF</button>
+            <button id="auto-mode">Enable Auto Mode</button>
+            <button id="manual-mode">Enable Manual Mode</button>
+        </div>
+    </div>
+    
+    <div class="charts">
+        <h2>Historical Data</h2>
+        <iframe src="https://thingspeak.com/channels/YOUR_CHANNEL_ID/charts/1"></iframe>
+        <iframe src="https://thingspeak.com/channels/YOUR_CHANNEL_ID/charts/2"></iframe>
+    </div>
+    
+    <script>
+        // Replace with your ThingSpeak channel details
+        const channelID = '2904195';
+        const readAPIKey = 'V85AAJF1GXJ7K7UX';
+        const writeAPIKey = 'NX8NR4TR0P7H64KR';
+        
+        // Update sensor values
+        function updateValues() {
+            $.getJSON(`https://api.thingspeak.com/channels/${channelID}/feeds/last.json?api_key=${readAPIKey}`, function(data) {
+                // Update moisture
+                const moisture = data.field1;
+                $('#moisture-value').text(moisture);
+                if (moisture < 30) {
+                    $('#moisture-status').text('Dry - Needs Water').removeClass().addClass('status danger');
+                } else if (moisture < 60) {
+                    $('#moisture-status').text('Adequate').removeClass().addClass('status good');
+                } else {
+                    $('#moisture-status').text('Wet').removeClass().addClass('status warning');
+                }
+                
+                // Update temperature
+                const temp = data.field2;
+                $('#temp-value').text(temp);
+                if (temp > 35) {
+                    $('#temp-status').text('Too Hot').removeClass().addClass('status danger');
+                } else if (temp < 10) {
+                    $('#temp-status').text('Too Cold').removeClass().addClass('status warning');
+                } else {
+                    $('#temp-status').text('Optimal').removeClass().addClass('status good');
+                }
+                
+                // Update humidity
+                const humidity = data.field3;
+                $('#humidity-value').text(humidity);
+                $('#humidity-status').text('Normal').removeClass().addClass('status good');
+                
+                // Update light
+                const light = data.field4;
+                $('#light-value').text(light);
+                if (light > 800) {
+                    $('#light-status').text('Bright').removeClass().addClass('status good');
+                } else if (light > 400) {
+                    $('#light-status').text('Moderate').removeClass().addClass('status good');
+                } else {
+                    $('#light-status').text('Low Light').removeClass().addClass('status warning');
+                }
+                
+                // Update pump status
+                const pump = data.field5;
+                if (pump == 1) {
+                    $('#pump-status').text('ON');
+                } else {
+                    $('#pump-status').text('OFF');
+                }
+            });
+        }
+        
+        // Control functions
+        $('#pump-on').click(function() {
+            $.get(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field6=1`);
+            setTimeout(updateValues, 2000);
+        });
+        
+        $('#pump-off').click(function() {
+            $.get(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field6=0`);
+            setTimeout(updateValues, 2000);
+        });
+        
+        $('#auto-mode').click(function() {
+            $.get(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field7=1`);
+        });
+        
+        $('#manual-mode').click(function() {
+            $.get(`https://api.thingspeak.com/update?api_key=${writeAPIKey}&field7=0`);
+        });
+        
+        // Update values immediately and then every 30 seconds
+        updateValues();
+        setInterval(updateValues, 30000);
+    </script>
+</body>
+</html>
